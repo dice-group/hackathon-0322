@@ -14,17 +14,17 @@ def extract_resources(question:str, answers:list):
     question_out = json.loads(r.data.decode('utf-8'))
 
     for ans in answers:
-    data  = {"text":ans}
-    encoded_data = json.dumps(data).encode('utf-8')
-    r = http.request(
-        'POST',
-        'https://labs.tib.eu/falcon/api?mode=long',
-        body=encoded_data,
-        headers={'Content-Type': 'application/json'}
-    )
-    answer_out = json.loads(r.data.decode('utf-8'))
-    for ent in answer_out['entities']:
-        result_ent_answer.append(ent[0])
+        data  = {"text":ans}
+        encoded_data = json.dumps(data).encode('utf-8')
+        r = http.request(
+            'POST',
+            'https://labs.tib.eu/falcon/api?mode=long',
+            body=encoded_data,
+            headers={'Content-Type': 'application/json'}
+        )
+        answer_out = json.loads(r.data.decode('utf-8'))
+        for ent in answer_out['entities']:
+            result_ent_answer.append(ent[0])
 
     for ent in question_out['entities']:
     result_ent_question.append(ent[0])
