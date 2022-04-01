@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# import argparse
+import argparse
 import SPARQLWrapper
 from pprint import pprint
 import networkx
@@ -31,24 +31,18 @@ sparql.setReturnFormat(SPARQLWrapper.JSON)
 #     'http://purl.org/dc/terms/subject',
 # }
 
-# parser = argparse.ArgumentParser()
-# parser.add_argument('entities', type=argparse.FileType('r'), required=True)
-# parser.add_argument('relations', type=argparse.FileType('r'), required=True)
-# parser.add_argument('answers', type=argparse.FileType('r'), required=True)
-# # args = parser.parse_args()
-# args = parser.parse_args(['--entities', 'entities.txt', '--relations', 'relations.txt', '--answers', 'answers.txt'])
+parser = argparse.ArgumentParser()
+parser.add_argument('--entities', type=argparse.FileType('r'), required=True)
+parser.add_argument('--relations', type=argparse.FileType('r'), required=True)
+parser.add_argument('--answers', type=argparse.FileType('r'), required=True)
+args = parser.parse_args()
+# args = parser.parse_args([
+#     '--entities', 'modules/sparql_generator/example-entities.txt',
+#     '--relations', 'modules/sparql_generator/example-relations.txt',
+#     '--answers', 'modules/sparql_generator/example-answers.txt',
+# ])
 
-# Case 2: an unknown resource links disconnected components of the graph
-input_entities = {
-    '<http://dbpedia.org/resource/French_Polynesia>',
-}
-answer_entities = {
-    '<http://dbpedia.org/resource/Michel_Buillard>',
-}
-input_relations = {
-    '<http://dbpedia.org/property/capital>',
-    '<http://dbpedia.org/ontology/mayor>',
-}
+input_entities, input_relations, answer_entities = ({f'<{line.strip()}>' for line in fd.readlines()} for fd in (args.entities, args.relations, args.answers))
 
 assert len(answer_entities) == 1
 triples = []
