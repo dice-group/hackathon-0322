@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-# import argparse
+import argparse
 import SPARQLWrapper
 from pprint import pprint
 import networkx
 import sys
+
+ANS = '@ANS@'
 
 def is_connected(triples):
     g = networkx.Graph()
@@ -12,10 +14,10 @@ def is_connected(triples):
     return len(list(aux_g.k_edge_components(k=1))) == 1
 
 def replace_answers(e):
-    return '?uri' if e in answer_entities else e
+    return '?uri' if e == ANS else e
 
 sparql = SPARQLWrapper.SPARQLWrapper('https://synthg-fact.dice-research.org/sparql')
-sparql.setReturnFormat(JSON)
+sparql.setReturnFormat(SPARQLWrapper.JSON)
 
 # # Case 1: connected graph can be constructed with the provided entities and relations
 # input_entities = {
@@ -31,60 +33,56 @@ sparql.setReturnFormat(JSON)
 #     'http://purl.org/dc/terms/subject',
 # }
 
-# parser = argparse.ArgumentParser()
-# parser.add_argument('entities', type=argparse.FileType('r'), required=True)
-# parser.add_argument('relations', type=argparse.FileType('r'), required=True)
-# parser.add_argument('answers', type=argparse.FileType('r'), required=True)
-# # args = parser.parse_args()
-# args = parser.parse_args(['--entities', 'entities.txt', '--relations', 'relations.txt', '--answers', 'answers.txt'])
+parser = argparse.ArgumentParser()
+parser.add_argument('--entities', type=argparse.FileType('r'), required=True)
+parser.add_argument('--relations', type=argparse.FileType('r'), required=True)
+parser.add_argument('--answers', type=argparse.FileType('r'), required=True)
+args = parser.parse_args()
+# args = parser.parse_args([
+#     '--entities', 'modules/sparql_generator/example-entities.txt',
+#     '--relations', 'modules/sparql_generator/example-relations.txt',
+#     '--answers', 'modules/sparql_generator/example-answers.txt',
+# ])
 
-# Case 2: an unknown resource links disconnected components of the graph
-input_entities = {
-    '<http://dbpedia.org/resource/French_Polynesia>',
-}
-answer_entities = {
-    '<http://dbpedia.org/resource/Michel_Buillard>',
-}
-input_relations = {
-    '<http://dbpedia.org/property/capital>',
-    '<http://dbpedia.org/ontology/mayor>',
-}
+input_entities, input_relations, answer_entities = ({f'<{line.strip()}>' for line in fd.readlines()} for fd in (args.entities, args.relations, args.answers))
 
-assert len(answer_entities) == 1
-triples = []
+triples = set()
 for ans in answer_entities:
-    for s in input_entities | {ans}:
+    for s in input_entities | {ANS}:
         for p in input_relations:
-            for o in input_entities | {ans}:
+            for o in input_entities | {ANS}:
                 if s != o:
-                    sparql.setQuery(f'ask where {{ {s} {p} {o} . }}')
+                    sparql.setQuery(f'ask where {{ {s} {p} {o} . }}'.replace(ANS, ans))
                     exists = sparql.query().convert()['boolean']
                     if exists:
-                        triples += [(s, p, o)]
+                        triples |= {(s, p, o)}
 
 def find_connection(triples):
     # TODO replace with a smarter query
-    for ans in answer_entities:
-        for e1 in input_entities | {ans}:
-            for e2 in input_entities | {ans}:
-                if e1 != e2:
-                    for p1 in input_relations:
-                        for p2 in input_relations:
-                            for s1, o1, s2, o2 in [
-                                    (e1, '?x', e2, '?x'),
-                                    ('?x', e1, e2, '?x'),
-                                    (e1, '?x', '?x', e2),
-                                    ('?x', e1, '?x', e2),
-                            ]:
-                                sparql.setQuery(f'select distinct ?x where {{ {s1} {p1} {o1} . {s2} {p2} {o2} . }}')
-                                results = sparql.queryAndConvert()
-                                if len(results['results']['bindings']) > 0:
-                                    x = f'<{results["results"]["bindings"][0]["x"]["value"]}>'
-                                    return [(s1.replace('?x', x), p1, o1.replace('?x', x)), (s2.replace('?x', x), p2, o2.replace('?x', x))]
+    for e1 in input_entities | {ANS}:
+        for e2 in input_entities | {ANS}:
+            if e1 != e2:
+                for p1 in input_relations:
+                    for p2 in input_relations:
+                        for s1, o1, s2, o2 in [
+                                (e1, '?x', e2, '?x'),
+                                ('?x', e1, e2, '?x'),
+                                (e1, '?x', '?x', e2),
+                                ('?x', e1, '?x', e2),
+                        ]:
+                            where = ''.join({f'{s1} {p1} {o1} . {s2} {p2} {o2} . '.replace('?x', f'?x_{i}').replace(ANS, ans) for i, ans in enumerate(answer_entities)})
+                            sparql.setQuery(f'select distinct ?x_0 where {{ {where} }}')
+                            results = sparql.queryAndConvert()
+                            if len(results['results']['bindings']) > 0:
+                                if len(answer_entities) == 1:
+                                    x = f'<{results["results"]["bindings"][0]["x_0"]["value"]}>'
+                                    s1, o1, s2, o2 = (e.replace('?x', x) for e in (s1, o1, s2, o2))
+                                return {(s1, p1, o1), (s2, p2, o2)}
+    print('No connection found', file=sys.stderr)
+    return set() # TODO
 
 if not is_connected(triples):
-    # Throws if nothing found.
-    triples += find_connection(triples)
+    triples |= find_connection(triples)
 
 query = 'select distinct ?uri where {\n'
 for s, p, o in triples:
@@ -97,4 +95,4 @@ print(query)
 sparql.setQuery(query)
 bindings = sparql.queryAndConvert()['results']['bindings']
 pprint(bindings, stream=sys.stderr)
-assert len(bindings) == 1
+# assert len(bindings) == len(answer_entities)
