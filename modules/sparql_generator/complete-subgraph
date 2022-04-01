@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+# import argparse
+import SPARQLWrapper
+from pprint import pprint
+import networkx
+import sys
+
+def is_connected(triples):
+    g = networkx.Graph()
+    g.add_edges_from(((s, o) for s, p, o in triples))
+    aux_g = networkx.algorithms.connectivity.EdgeComponentAuxGraph.construct(g)
+    return len(list(aux_g.k_edge_components(k=1))) == 1
+
+def replace_answers(e):
+    return '?uri' if e in answer_entities else e
+
+sparql = SPARQLWrapper.SPARQLWrapper('https://synthg-fact.dice-research.org/sparql')
+sparql.setReturnFormat(JSON)
+
+# # Case 1: connected graph can be constructed with the provided entities and relations
+# input_entities = {
+#     'http://dbpedia.org/ontology/Person',
+#     'http://dbpedia.org/resource/Category:American_assassins',
+#     'http://dbpedia.org/resource/Category:Assassination_of_William_McKinley',
+# }
+# answer_entities = {
+#     'http://dbpedia.org/resource/Leon_Czolgosz',
+# }
+# input_relations = {
+#     'http://www.w3.org/1999/02/22-rdf-syntax-ns#type',
+#     'http://purl.org/dc/terms/subject',
+# }
+
+# parser = argparse.ArgumentParser()
+# parser.add_argument('entities', type=argparse.FileType('r'), required=True)
+# parser.add_argument('relations', type=argparse.FileType('r'), required=True)
+# parser.add_argument('answers', type=argparse.FileType('r'), required=True)
+# # args = parser.parse_args()
+# args = parser.parse_args(['--entities', 'entities.txt', '--relations', 'relations.txt', '--answers', 'answers.txt'])
+
+# Case 2: an unknown resource links disconnected components of the graph
+input_entities = {
+    '<http://dbpedia.org/resource/French_Polynesia>',
+}
+answer_entities = {
+    '<http://dbpedia.org/resource/Michel_Buillard>',
+}
+input_relations = {
+    '<http://dbpedia.org/property/capital>',
+    '<http://dbpedia.org/ontology/mayor>',
+}
+
+assert len(answer_entities) == 1
+triples = []
+for ans in answer_entities:
+    for s in input_entities | {ans}:
+        for p in input_relations:
+            for o in input_entities | {ans}:
+                if s != o:
+                    sparql.setQuery(f'ask where {{ {s} {p} {o} . }}')
+                    exists = sparql.query().convert()['boolean']
+                    if exists:
+                        triples += [(s, p, o)]
+
+def find_connection(triples):
+    # TODO replace with a smarter query
+    for ans in answer_entities:
+        for e1 in input_entities | {ans}:
+            for e2 in input_entities | {ans}:
+                if e1 != e2:
+                    for p1 in input_relations:
+                        for p2 in input_relations:
+                            for s1, o1, s2, o2 in [
+                                    (e1, '?x', e2, '?x'),
+                                    ('?x', e1, e2, '?x'),
+                                    (e1, '?x', '?x', e2),
+                                    ('?x', e1, '?x', e2),
+                            ]:
+                                sparql.setQuery(f'select distinct ?x where {{ {s1} {p1} {o1} . {s2} {p2} {o2} . }}')
+                                results = sparql.queryAndConvert()
+                                if len(results['results']['bindings']) > 0:
+                                    x = f'<{results["results"]["bindings"][0]["x"]["value"]}>'
+                                    return [(s1.replace('?x', x), p1, o1.replace('?x', x)), (s2.replace('?x', x), p2, o2.replace('?x', x))]
+
+if not is_connected(triples):
+    # Throws if nothing found.
+    triples += find_connection(triples)
+
+query = 'select distinct ?uri where {\n'
+for s, p, o in triples:
+    query += f'{replace_answers(s)} {p} {replace_answers(o)} .\n'
+query += '}'
+
+print(query)
+
+# Test the query
+sparql.setQuery(query)
+bindings = sparql.queryAndConvert()['results']['bindings']
+pprint(bindings, stream=sys.stderr)
+assert len(bindings) == 1
