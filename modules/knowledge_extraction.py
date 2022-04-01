@@ -24,9 +24,7 @@ def extract_resources(text_question, answer_list):
         # Falcon
         process_list.append(Process(target=parallel_wrapper,
                                     args=('fal', fal.extract_resources, [text_question, answer_list], res_dict)))
-        # Indexing Based
-        process_list.append(Process(target=parallel_wrapper,
-                                    args=('ind', ind.extract_resources, [text_question, answer_list], res_dict)))
+
         # Spacy
         process_list.append(Process(target=parallel_wrapper,
                                     args=('spa', spa.extract_resources, [text_question, answer_list], res_dict)))
@@ -42,12 +40,26 @@ def extract_resources(text_question, answer_list):
             proc.join()
         # copy all the results from the shared managed object
         for key in res_dict:
-            q_ent_list, q_rel_list, a_ent_list = res_dict[key]
+            sol = res_dict[key]
+            q_ent_list = sol[0]
+            q_rel_list = sol[1]
+            a_ent_list = sol[2]
             q_entity_list.extend(q_ent_list)
             q_relation_list.append(q_rel_list)
             a_entity_list.append(a_ent_list)
+
+        # Indexing Based
+        proc_ind = Process(target=parallel_wrapper,
+                           args=('ind', ind.extract_resources, [text_question, a_entity_list], res_dict))
+        proc_ind.start()
+        proc_ind.join()
+        q_ent_list, q_rel_list, a_ent_list = res_dict['ind']
+        q_entity_list.extend(q_ent_list)
+        q_relation_list.append(q_rel_list)
+
     return q_entity_list, q_relation_list, a_entity_list
 
 
 def parallel_wrapper(key, func, args, res):
-    res[key] = func(*args)
+    res1, res2, res3 = func(*args)
+    res[key] = (res1, res2, res3)

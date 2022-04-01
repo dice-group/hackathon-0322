@@ -11,17 +11,17 @@ def extract_resources(text_question, answer_list):
     dictionary = {}
     dictionary["input-text"] = text_question
     dictionary["indexname"] = "tripleindextyped"
-    dictionary["size"] = 10
+    dictionary["size"] = 5
     text = json.dumps(dictionary)
     resp = requests.get('http://ea-test.cs.upb.de:5000/get-triples-by-text', json=dictionary).json()
     entityset = set()
     relationset = set()
     answerset = set()
-    answerset.add(answer_list)
+    answerset.update(answer_list)
     for triple in resp['triples']:
         if not triple['subject'] in answerset:
             entityset.add(triple['subject'])
         relationset.add(triple['predicate'])
         if not triple['object'] in answerset and 'http' in triple['object']:
             entityset.add(triple['object'])
-    return list(entityset), list(relationset), list(answerset)
+    return list(entityset), list(relationset)
