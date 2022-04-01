@@ -27,9 +27,9 @@ def extract_resources(question:str, answers:list):
             result_ent_answer.append(ent[0])
 
     for ent in question_out['entities']:
-    result_ent_question.append(ent[0])
+        result_ent_question.append(ent[0])
 
     for rel in question_out['relations']:
-    result_rel_question.append(rel[0])  
+        result_rel_question.append(rel[0])
 
     return result_ent_question, result_rel_question, result_ent_answer
