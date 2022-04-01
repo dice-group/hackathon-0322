@@ -70,14 +70,16 @@ def find_connection(triples):
                                 (e1, '?x', '?x', e2),
                                 ('?x', e1, '?x', e2),
                         ]:
-                            where = ''.join({f'{s1} {p1} {o1} . {s2} {p2} {o2} .'.replace(ANS, ans) for ans in answer_entities})
-                            sparql.setQuery(f'select distinct ?x where {{ {where} }}')
+                            where = ''.join({f'{s1} {p1} {o1} . {s2} {p2} {o2} . '.replace('?x', f'?x_{i}').replace(ANS, ans) for i, ans in enumerate(answer_entities)})
+                            sparql.setQuery(f'select distinct ?x_0 where {{ {where} }}')
                             results = sparql.queryAndConvert()
                             if len(results['results']['bindings']) > 0:
-                                x = f'<{results["results"]["bindings"][0]["x"]["value"]}>'
-                                return {(s1.replace('?x', x), p1, o1.replace('?x', x)), (s2.replace('?x', x), p2, o2.replace('?x', x))}
+                                if len(answer_entities) == 1:
+                                    x = f'<{results["results"]["bindings"][0]["x_0"]["value"]}>'
+                                    s1, o1, s2, o2 = (e.replace('?x', x) for e in (s1, o1, s2, o2))
+                                return {(s1, p1, o1), (s2, p2, o2)}
     print('No connection found', file=sys.stderr)
-    return [] # FIXME
+    return set() # TODO
 
 if not is_connected(triples):
     triples |= find_connection(triples)
@@ -92,5 +94,5 @@ print(query)
 # Test the query
 sparql.setQuery(query)
 bindings = sparql.queryAndConvert()['results']['bindings']
-pprint({binding['uri']['value'] for binding in bindings}, stream=sys.stderr)
+pprint(bindings, stream=sys.stderr)
 # assert len(bindings) == len(answer_entities)
