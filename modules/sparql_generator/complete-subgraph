@@ -15,7 +15,7 @@ def replace_answers(e):
     return '?uri' if e in answer_entities else e
 
 sparql = SPARQLWrapper.SPARQLWrapper('https://synthg-fact.dice-research.org/sparql')
-sparql.setReturnFormat(JSON)
+sparql.setReturnFormat(SPARQLWrapper.JSON)
 
 # # Case 1: connected graph can be constructed with the provided entities and relations
 # input_entities = {
