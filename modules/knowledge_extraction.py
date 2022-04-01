@@ -7,8 +7,9 @@ import extractors.tagme_extractor as tag
 
 
 def extract_resources(text_question, answer_list):
-    entity_list = list()
-    relation_list = list()
+    q_entity_list = list()
+    q_relation_list = list()
+    a_entity_list = list()
     """
     Knowledge Extraction
     """
@@ -41,10 +42,11 @@ def extract_resources(text_question, answer_list):
             proc.join()
         # copy all the results from the shared managed object
         for key in res_dict:
-            ent_list, rel_list = res_dict[key]
-            entity_list.extend(ent_list)
-            relation_list.append(rel_list)
-    return entity_list, relation_list
+            q_ent_list, q_rel_list, a_ent_list = res_dict[key]
+            q_entity_list.extend(q_ent_list)
+            q_relation_list.append(q_rel_list)
+            a_entity_list.append(a_ent_list)
+    return q_entity_list, q_relation_list, a_entity_list
 
 
 def parallel_wrapper(key, func, args, res):
