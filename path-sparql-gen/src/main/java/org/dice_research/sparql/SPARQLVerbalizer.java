@@ -10,6 +10,9 @@ import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.Syntax;
 import org.dllearner.kb.sparql.SparqlEndpoint;
 
+/**
+ * https://github.com/AKSW/SPARQL2NL/blob/master/src/test/java/org/aksw/sparql2nl/SPARQL2NLTest.java
+ */
 public class SPARQLVerbalizer {
   private SparqlEndpoint ep;
   private SimpleNLGwithPostprocessing snlg;
